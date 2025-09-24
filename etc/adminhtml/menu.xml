@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+	<menu>
+	  <add id="Fastcoo_Management::fastcoo" title="Fastcoo" translate="title" module="Fastcoo_Management" sortOrder="90" dependsOnModule="Fastcoo_Management" resource="Fastcoo_Management::fastcoo"/>
+	  <add id="Fastcoo_Management::order" title="Order List" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::fastcoo" sortOrder="50" dependsOnModule="Fastcoo_Management" resource="Fastcoo_Management::order"/>
+      <!-- <add id="Fastcoo_Management::order" title="Product List" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::fastcoo" sortOrder="50" dependsOnModule="Fastcoo_Management" resource="Fastcoo_Management::order"/>
+      <add id="Fastcoo_Management::order" title="Settings" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::fastcoo" sortOrder="50" dependsOnModule="Fastcoo_Management" resource="Fastcoo_Management::order"/> -->
+	  <add id="Fastcoo_Management::order_list" title="Order List" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::order" sortOrder="10" dependsOnModule="Fastcoo_Management" action="fastcoo/order/index" resource="Fastcoo_Management::order_list"/>
+        <add id="Fastcoo_Management::product_list" title="Product List" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::order" sortOrder="10" dependsOnModule="Fastcoo_Management" action="fastcoo/product/index" resource="Fastcoo_Management::product_list"/>
+         <add id="Fastcoo_Management::settings" title="Settings" translate="title" module="Fastcoo_Management" parent="Fastcoo_Management::order" sortOrder="10" dependsOnModule="Fastcoo_Management" action="fastcoo/settings/index" resource="Fastcoo_Management::settings"/>
+	</menu>
+</config>

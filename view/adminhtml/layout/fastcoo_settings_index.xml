@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+  <head>
+    <title>Fastcoo Settings</title>
+  </head>
+  <body>
+    <referenceContainer name="content">
+      <block class="Fastcoo\Management\Block\Adminhtml\Settings\Form"
+       name="fastcoo_settings"
+       template="Fastcoo_Management::settings/form.phtml"/>
+
+    </referenceContainer>
+  </body>
+</page>

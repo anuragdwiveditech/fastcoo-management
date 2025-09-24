@@ -1,0 +1,96 @@
+<?php
+
+$om = \Magento\Framework\App\ObjectManager::getInstance();
+$settingsFactory = $om->create(\Fastcoo\Management\Model\SettingsFactory::class);
+$settingsResource = $om->create(\Fastcoo\Management\Model\ResourceModel\Settings::class);
+
+$settings = $settingsFactory->create();
+$settingsResource->load($settings, 1);
+$data = $settings->getData();
+
+//print_r($data); die();
+
+/** @var $block \Fastcoo\Management\Block\Adminhtml\Settings\Form */
+//$settings = method_exists($block, 'getSettings') ? $block->getSettings() : null;
+$endpoint = $settings ? $block->escapeHtml($settings->getData('endpoint_url')) : '';
+$customerId = $settings ? $block->escapeHtml($settings->getData('customer_id')) : '';
+$secretKey = $settings ? $block->escapeHtml($settings->getData('secret_key')) : '';
+$systemType = $settings ? $block->escapeHtml($settings->getData('system_type')) : '';
+$saveUrl = method_exists($block, 'getSaveUrl') ? $block->getSaveUrl() : $block->getUrl('fastcoo/settings/save');
+
+?>
+
+<div class="fastcoo-settings">
+    <form action="<?= $saveUrl ?>" method="post" id="fastcoo-settings-form">
+        <input name="form_key" type="hidden" value="<?= $block->getFormKey(); ?>" />
+
+        <fieldset class="admin__fieldset">
+            <!-- Endpoint URL -->
+            <div class="admin__field">
+                <label class="admin__field-label" for="endpoint_url">
+                    <span><?= __('Endpoint URL') ?></span>
+                </label>
+                <div class="admin__field-control">
+                    <input type="text" 
+                           id="endpoint_url" 
+                           name="endpoint_url" 
+                           value="<?= $endpoint ?>" 
+                           class="admin__control-text" />
+                </div>
+            </div>
+
+            <!-- Customer ID -->
+            <div class="admin__field">
+                <label class="admin__field-label" for="customer_id">
+                    <span><?= __('Customer ID') ?></span>
+                </label>
+                <div class="admin__field-control">
+                    <input type="text" 
+                           id="customer_id" 
+                           name="customer_id" 
+                           value="<?= $customerId ?>" 
+                           class="admin__control-text" />
+                </div>
+            </div>
+
+            <!-- Secret Key -->
+            <div class="admin__field">
+                <label class="admin__field-label" for="secret_key">
+                    <span><?= __('Secret Key') ?></span>
+                </label>
+                <div class="admin__field-control">
+                    <input type="password" 
+                           id="secret_key" 
+                           name="secret_key" 
+                           value="<?= $secretKey ?>" 
+                           class="admin__control-text" />
+                </div>
+            </div>
+
+            <!-- System Type -->
+            <div class="admin__field">
+                <label class="admin__field-label" for="system_type">
+                    <span><?= __('System Type') ?></span>
+                </label>
+                <div class="admin__field-control">
+                    <select id="system_type" 
+                            name="system_type" 
+                            class="admin__control-select">
+                        <option value=""><?= __('Select system type') ?></option>
+                        <option value="FM" <?= $systemType === 'FM' ? 'selected' : '' ?>>FM</option>
+                        <option value="LM" <?= $systemType === 'LM' ? 'selected' : '' ?>>LM</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Submit -->
+        <div class="admin__field">
+            <div class="admin__field-control">
+                <button type="submit" class="action-primary">
+                    <?= __('Save') ?>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
