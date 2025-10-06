@@ -1,0 +1,89 @@
+<?php /** @var $block \Magento\Framework\View\Element\Template */ ?>
+<script type="text/javascript">
+/* global jQuery */
+(function ($) { alert('cccc');
+    // server-side URL and form key
+    var sendUrl = '<?= $block->escapeUrl($block->getUrl("fastcoo/product/send")) ?>';
+    var formKey = '<?= $block->escapeHtml($block->getFormKey()) ?>';
+
+    // define the logic to collect selected ids and call controller
+    window.sendSelectedProducts = function () {
+        var ids = [];
+        $('input[data-role="select-row"]:checked').each(function(){ if (this.value) ids.push(this.value); });
+        $('input[name="selected[]"]:checked').each(function(){ if (this.value) ids.push(this.value); });
+
+        if (!ids.length) {
+            if (window.require) {
+                require(['Magento_Ui/js/modal/alert','mage/translate'], function(alert, $t){
+                    alert({ title: $t('Attention'), content: $t('Please select product(s).') });
+                });
+            } else {
+                alert('Please select product(s).');
+            }
+            return;
+        }
+
+        if (!confirm('Send selected products?')) return;
+
+        $.ajax({
+            url: sendUrl,
+            type: 'POST',
+            dataType: 'json',
+            data: { form_key: formKey, selected: ids },
+            success: function (res) {
+                if (res && res.success) {
+                    alert(res.message || 'Products sent successfully.');
+                    location.reload();
+                } else {
+                    alert((res && res.message) ? res.message : 'Error occurred.');
+                }
+            },
+            error: function () {
+                alert('Error occurred while sending products.');
+            }
+        });
+    };
+
+    // inject button into header (tries multiple selectors to be robust)
+    $(function () {
+        var buttonHtml = '<button id="fastcoo-send-btn" class="action-secondary"><span><span>Send Product</span></span></button>';
+
+        // possible header containers (search in order)
+        var selectors = [
+            '.page-actions',                 // common
+            '.page-main-actions',            // some themes
+            '.page-actions .actions',        // nested
+            '.admin__page-actions',          // admin ui class
+            '.page-title-actions'            // fallback
+        ];
+
+        var placed = false;
+        for (var i = 0; i < selectors.length; i++) {
+            var $h = $(selectors[i]);
+            if ($h.length) {
+                // try to place before Add Product button if present
+                var $add = $h.find('.add, button.add, button[data-ui-id*="add-new"]');
+                if ($add.length) {
+                    $add.first().before(buttonHtml);
+                } else {
+                    $h.first().prepend(buttonHtml);
+                }
+                placed = true;
+                break;
+            }
+        }
+
+        // fallback: prepend at top of content
+        if (!placed) {
+            $('body').first().prepend('<div style="padding:10px;">' + buttonHtml + '</div>');
+        }
+
+        // attach click handler (call our global function)
+        $(document).on('click', '#fastcoo-send-btn', function (e) {
+            e.preventDefault();
+           // sendSelectedProducts();
+           alert();
+        });
+    });
+})(jQuery);
+</script>

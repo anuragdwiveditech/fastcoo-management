@@ -1,11 +1,19 @@
 <?xml version="1.0"?>
-<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
-	<head>
-		<title>Order List</title>
-	</head>
-	<body>
-		<referenceContainer name="content">
-			<block class="Magento\Backend\Block\Template" template="Fastcoo_Management::order_list.phtml"/>
-		</referenceContainer>
-	</body>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="styles"/>
+    <body>
+
+    
+
+        <referenceContainer name="page.main.actions">
+        <block class="Magento\Backend\Block\Template" name="fastcoo.send.order.button"
+           template="Fastcoo_Management::grid/send-order-button.phtml" before="-"/>
+     </referenceContainer>
+        <referenceContainer name="content">
+         <uiComponent name="fastcoo_order_listing"/>
+        </referenceContainer>
+      
+
+    </body>
 </page>

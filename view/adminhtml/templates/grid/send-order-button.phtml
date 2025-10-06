@@ -1,0 +1,138 @@
+<?php
+/** @var $block \Magento\Backend\Block\Template */
+$sendUrl = $block->getUrl('fastcoo/order/massSend');   // controller for sending orders
+$syncUrl = $block->getUrl('fastcoo/order/sync');      // controller for track & sync (adjust if different)
+$labelSend = __('Send Order');
+$labelSync = __('Track & Sync');
+$formKey = $block->getFormKey();
+?>
+<div class="page-actions-inner">
+    <div class="page-actions-buttons" style="display:flex; align-items:center;">
+
+        <!-- Hidden form we will submit (single form, action changed dynamically) -->
+        <form id="fastcoo_action_form" action="<?php echo $block->escapeUrl($sendUrl); ?>" method="post" style="display:none;">
+            <input name="form_key" type="hidden" value="<?php echo $block->escapeHtml($formKey); ?>"/>
+        </form>
+
+        <!-- Send Order button (left) -->
+        <button id="fastcoo_send_button" style="font-size: 1.6rem;
+    letter-spacing: .025em;
+    padding-bottom: 0.6875em;
+    padding-top: 0.6875em; margin-left:8px; background-color: rgb(11, 130, 124);"
+                type="button"
+                class="action scalable secondary"
+                data-action="<?php echo $block->escapeUrl($sendUrl); ?>"
+                title="<?php echo $block->escapeHtml($labelSend); ?>"
+                data-ui-id="fastcoo-send-button">
+            <span><?php echo $block->escapeHtml($labelSend) ?></span>
+        </button>
+
+        <!-- Track & Sync button (right of Send Order) -->
+        <button id="fastcoo_sync_button" style="font-size: 1.6rem;
+    letter-spacing: .025em;
+    padding-bottom: 0.6875em;
+    padding-top: 0.6875em; margin-left:8px; background-color: rgb(45, 67, 115); color:white;"
+                type="button"
+                class="action scalable"
+                data-action="<?php echo $block->escapeUrl($syncUrl); ?>"
+                title="<?php echo $block->escapeHtml($labelSync); ?>"
+                data-ui-id="fastcoo-sync-button">
+            <span><?php echo $block->escapeHtml($labelSync) ?></span>
+        </button>
+
+    </div>
+</div>
+
+<script type="text/javascript">
+require(['jquery'], function($) {
+    'use strict';
+    $(function() {
+        var $form = $('#fastcoo_action_form');
+
+        // Collect selected ids robustly (tries common selectors + fallback)
+        function collectSelectedIds() {
+            var selectors = [
+                'input[name="ids[]"]:checked',
+                'input[name="selected[]"]:checked',
+                '.data-grid input[type="checkbox"]:checked',
+                '.admin__data-grid input[type="checkbox"]:checked',
+                'input[type="checkbox"].admin__action-checkbox:checked',
+                'input[type="checkbox"][data-role="select-row"]:checked'
+            ];
+
+            var ids = [];
+
+            for (var i = 0; i < selectors.length; i++) {
+                $(selectors[i]).each(function() {
+                    var v = $(this).val();
+                    if (v && $.inArray(v.toString(), ids) === -1) {
+                        ids.push(v.toString());
+                    }
+                });
+                if (ids.length) break;
+            }
+
+            if (!ids.length) {
+                // fallback: check all checked checkboxes and try attributes
+                $('input[type="checkbox"]:checked').each(function() {
+                    var $ch = $(this);
+                    var v = $ch.val();
+                    if (v && $.inArray(v.toString(), ids) === -1) {
+                        ids.push(v.toString());
+                    } else {
+                        var dataId = $ch.attr('data-row-id') || $ch.attr('data-id') ||
+                                     $ch.closest('[data-row-id]').attr('data-row-id') ||
+                                     $ch.closest('tr').data('row-id');
+                        if (dataId && $.inArray(String(dataId), ids) === -1) {
+                            ids.push(String(dataId));
+                        }
+                    }
+                });
+            }
+
+            return ids;
+        }
+
+        // Generic click handler: reads data-action, collects ids and submits
+        function bindAction(buttonSelector) {
+            $(buttonSelector).on('click', function(e) {
+                e.preventDefault();
+                var $btn = $(this);
+                var action = $btn.data('action');
+                var ids = collectSelectedIds();
+
+                if (!ids || !ids.length) {
+                    alert('<?php echo $block->escapeHtml(__('Please select at least one order to perform this action.')); ?>');
+                    if (window.console && console.log) {
+                        console.log('[fastcoo] no ids found. Try checking DOM for massaction checkbox selectors.');
+                    }
+                    return;
+                }
+
+                // remove old inputs
+                $form.find('input[name="selected[]"], input[name="ids[]"]').remove();
+
+                // attach selected[] as POST params
+                for (var i = 0; i < ids.length; i++) {
+                    $('<input>').attr({
+                        type: 'hidden',
+                        name: 'selected[]'
+                    }).val(ids[i]).appendTo($form);
+                }
+
+                // set dynamic action and submit
+                $form.attr('action', action);
+
+                if (window.console && console.log) {
+                    console.log('[fastcoo] submitting', { action: action, selectedCount: ids.length, selected: ids });
+                }
+
+                $form.submit();
+            });
+        }
+
+        bindAction('#fastcoo_send_button');
+        bindAction('#fastcoo_sync_button');
+    });
+});
+</script>

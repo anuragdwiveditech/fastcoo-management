@@ -18,9 +18,10 @@ class Index extends Action
     }
 
     public function execute()
-    {
+    {   
         $page = $this->resultPageFactory->create();
         $page->getConfig()->getTitle()->prepend(__('Fastcoo - Settings'));
+          $page->setActiveMenu('Fastcoo_Management::fastcoo');
         return $page;
     }
 }

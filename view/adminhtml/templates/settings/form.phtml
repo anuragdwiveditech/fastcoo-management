@@ -16,6 +16,7 @@ $endpoint = $settings ? $block->escapeHtml($settings->getData('endpoint_url')) :
 $customerId = $settings ? $block->escapeHtml($settings->getData('customer_id')) : '';
 $secretKey = $settings ? $block->escapeHtml($settings->getData('secret_key')) : '';
 $systemType = $settings ? $block->escapeHtml($settings->getData('system_type')) : '';
+$status = $settings ? $block->escapeHtml($settings->getData('status')) : '';
 $saveUrl = method_exists($block, 'getSaveUrl') ? $block->getSaveUrl() : $block->getUrl('fastcoo/settings/save');
 
 ?>
@@ -82,6 +83,18 @@ $saveUrl = method_exists($block, 'getSaveUrl') ? $block->getSaveUrl() : $block->
                     </select>
                 </div>
             </div>
+
+            <div class="admin__field">
+    <label class="admin__field-label" for="status">
+        <span><?= __('Status') ?></span>
+    </label>
+    <div class="admin__field-control">
+        <select id="status" name="status" class="admin__control-select">
+            <option value="1" <?= $status == '1' ? 'selected' : '' ?>><?= __('Enable') ?></option>
+            <option value="0" <?= $status == '0' ? 'selected' : '' ?>><?= __('Disable') ?></option>
+        </select>
+    </div>
+</div>
         </fieldset>
 
         <!-- Submit -->

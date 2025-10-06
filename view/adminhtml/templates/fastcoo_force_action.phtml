@@ -1,0 +1,54 @@
+<script type="text/javascript">
+require(['jquery'], function($) {
+    $(function() {
+        var fastcooSaveUrl = "<?= $block->getUrl('fastcoo/management/product/save') ?>";
+        var catalogSaveSegment = '/catalog/product/save';
+
+        // 1) Ensure form.action (safety)
+        var ensureForm = function() {
+            var form = $('#product_form');
+            if (!form.length) form = $('form[name="product_form"], form[id^="product"]');
+            if (form.length) {
+                form.attr('action', fastcooSaveUrl);
+                form.attr('enctype', 'multipart/form-data');
+                form.off('submit.fastcoo').on('submit.fastcoo', function() {
+                    form.attr('action', fastcooSaveUrl);
+                });
+                return true;
+            }
+            return false;
+        };
+
+        // Try immediately and retry (for KO re-renders)
+        if (!ensureForm()) {
+            var tries = 0;
+            var t = setInterval(function() {
+                tries++;
+                if (ensureForm() || tries > 20) clearInterval(t);
+            }, 150);
+        }
+
+        // 2) Intercept all jQuery AJAX requests and rewrite catalog product save => fastcoo save
+        $.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+            if (typeof options.url === 'string') {
+                // match common patterns — adjust if your admin URL has extra path segments
+                if (options.url.indexOf(catalogSaveSegment) !== -1) {
+                    options.url = options.url.replace(catalogSaveSegment, '/fastcoo/management/product/save');
+                }
+                // also handle full absolute URLs pointing to admin base + catalog/product/save
+                if (options.url.indexOf('/admin/catalog/product/save') !== -1) {
+                    options.url = options.url.replace('/admin/catalog/product/save', '/admin/fastcoo/management/product/save');
+                }
+            }
+        });
+
+        // 3) As extra safety: intercept form submit triggered by buttonAdapter (non-AJAX fallback)
+        $(document).on('click', '#save, button[data-ui-id="save-button"], button.save', function() {
+            var form = $('#product_form');
+            if (!form.length) form = $('form[name="product_form"], form[id^="product"]');
+            if (form.length) form.attr('action', fastcooSaveUrl);
+        });
+
+    });
+});
+</script>

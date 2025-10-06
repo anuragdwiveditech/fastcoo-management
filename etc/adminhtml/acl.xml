@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<acl xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <resources>
+        <resource id="Magento_Backend::admin">
+            <resource id="Fastcoo_Management::product_list" title="Fastcoo Product List" sortOrder="10">
+                <resource id="Fastcoo_Management::add" title="Add Product (Fastcoo)" sortOrder="10"/>
+                <!-- or for customer button -->
+                <resource id="Fastcoo_Management::add_customer" title="Add Customer (Fastcoo)" sortOrder="20"/>
+                <resource id="Fastcoo_Management::products" title="Fastcoo Product Save" sortOrder="10" />
+                <resource id="Fastcoo_Management::product_action"
+                          title="Custom Product Action (Fastcoo)"
+                          sortOrder="40"/>
+        <resource id="Fastcoo_Management::order_list" title="Fastcoo Order List"/>
+        <resource id="Fastcoo_Management::order_create" title="Create Fastcoo Order"/>
+            </resource>
+        </resource>
+    </resources>
+</acl>

@@ -1,0 +1,135 @@
+<?php /** @var $block \Magento\Framework\View\Element\Template */ ?>
+<script type="text/javascript">
+/* global jQuery */
+(function ($) {
+    // server-side values
+    var SEND_URL = '<?= $block->escapeUrl($block->getUrl("fastcoo/product/send")) ?>';
+    var FORM_KEY = '<?= $block->escapeHtml($block->getFormKey()) ?>';
+
+    // collect ids helper
+    function collectSelectedIds() {
+        var ids = [];
+        $('input[data-role="select-row"]:checked').each(function () { if (this.value) ids.push(this.value); });
+        $('input[name="selected[]"]:checked').each(function () { if (this.value) ids.push(this.value); });
+
+        if (!ids.length) {
+            var mass = $('input[name="selected"]').val() || $('input[name="massaction[]"]').val();
+            if (mass) {
+                var parts = mass.toString().split(',');
+                for (var i = 0; i < parts.length; i++) {
+                    var p = parts[i].trim();
+                    if (p) ids.push(p);
+                }
+            }
+        }
+
+        // dedupe
+        ids = ids.filter(function (v, i, a) { return a.indexOf(v) === i; });
+        return ids;
+    }
+
+    // === actual worker function (does the AJAX) ===
+    window.sendSelectedProducts = function (url, formKey) {
+        var targetUrl = url || SEND_URL;
+        var fk = formKey || FORM_KEY;
+        var ids = collectSelectedIds();
+
+        if (!ids.length) {
+            if (window.require) {
+                require(['Magento_Ui/js/modal/alert','mage/translate'], function (alert, $t) {
+                    alert({ title: $t('Attention'), content: $t('Please select product(s).') });
+                });
+            } else {
+                alert('Please select product(s).');
+            }
+            return;
+        }
+
+        if (!confirm('Send ' + ids.length + ' selected product(s)?')) {
+            return;
+        }
+
+        $.ajax({
+            url: targetUrl,
+            type: 'POST',
+            dataType: 'json',
+            data: { form_key: fk, selected: ids },
+            success: function (res) {
+                if (res && res.success) {
+                    if (window.require) {
+                        require(['Magento_Ui/js/modal/alert','mage/translate'], function (alert, $t) {
+                            alert({
+                                title: $t('Success'),
+                                content: res.message || $t('Products sent successfully.'),
+                                actions: { always: function () { location.reload(); } }
+                            });
+                        });
+                    } else {
+                        alert(res.message || 'Products sent successfully.');
+                        location.reload();
+                    }
+                } else {
+                    var msg = (res && res.message) ? res.message : 'An error occurred.';
+                    if (window.require) {
+                        require(['Magento_Ui/js/modal/alert','mage/translate'], function (alert, $t) {
+                            alert({ title: $t('Error'), content: msg });
+                        });
+                    } else {
+                        alert(msg);
+                    }
+                }
+            },
+            error: function (xhr) {
+                var msg = 'An error occurred while sending products.';
+                if (xhr && xhr.responseText) {
+                    try { var obj = JSON.parse(xhr.responseText); if (obj.message) msg = obj.message; } catch(e) {}
+                }
+                if (window.require) {
+                    require(['Magento_Ui/js/modal/alert','mage/translate'], function (alert, $t) {
+                        alert({ title: $t('Error'), content: msg });
+                    });
+                } else {
+                    alert(msg);
+                }
+            }
+        });
+    };
+
+    // === wrapper that the button calls ===
+    window.fastcooButtonClick = function (url, formKey) {
+        // use require to ensure jQuery present
+        if (typeof require === 'function') {
+            require(['jquery'], function ($) {
+                var tries = 0, max = 100;
+                (function wait() {
+                    if (typeof window.sendSelectedProducts === 'function') {
+                        try {
+                            window.sendSelectedProducts(url, formKey);
+                        } catch (e) {
+                            console && console.error(e);
+                            alert('Error executing send function.');
+                        }
+                    } else {
+                        tries++;
+                        if (tries > max) {
+                            alert('Send function not ready. Please reload page.');
+                            return;
+                        }
+                        setTimeout(wait, 50);
+                    }
+                })();
+            });
+        } else {
+            // fallback without require
+            var t = 0, interval = setInterval(function () {
+                if (typeof window.sendSelectedProducts === 'function') {
+                    clearInterval(interval);
+                    try { window.sendSelectedProducts(url, formKey); } catch (e) { console.error(e); alert('Error executing send function.'); }
+                }
+                t++;
+                if (t > 100) { clearInterval(interval); alert('Send function not available.'); }
+            }, 50);
+        }
+    };
+})(jQuery);
+</script>

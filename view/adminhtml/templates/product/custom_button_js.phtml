@@ -1,0 +1,270 @@
+<?php
+/** @var $block \Magento\Backend\Block\Template */
+$ajaxUrl = $block->getUrl('fastcoo/product/sendproduct');
+?>
+<style>
+    #fastcoo-custom-action { margin-left:8px; }
+    #fastcoo-ajax-result {
+        margin: 10px 0;
+        padding: 10px 14px;
+        border-radius: 4px;
+        display: none;
+        max-width: 700px;
+        box-sizing: border-box;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+    #fastcoo-ajax-result .ff-heading {
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+    #fastcoo-ajax-result ul { margin: 6px 0 12px 18px; padding: 0; }
+    #fastcoo-ajax-result li { margin: 4px 0; }
+    #fastcoo-ajax-result .success-badge { color: #1a7f37; font-weight: 600; margin-right:6px; }
+    #fastcoo-ajax-result .error-badge { color: #a12a2a; font-weight: 600; margin-right:6px; }
+    #fastcoo-ajax-result .sku { font-weight: 600; margin-right:6px; }
+</style>
+
+<div id="fastcoo-custom-button-placeholder" style="display:none;">FASTCOO_PLACEHOLDER</div>
+
+<script type="text/javascript">
+require(['jquery'], function($) {
+    'use strict';
+    $(function() {
+
+        // --- Utilities ---
+        function safeLog() { try { console.log.apply(console, arguments); } catch(e) {} }
+        function safeError() { try { console.error.apply(console, arguments); } catch(e) {} }
+
+        function createButtonElement() {
+            var btn = document.createElement('button');
+            btn.id = 'fastcoo-custom-action';
+            btn.type = 'button';
+            btn.className = 'action-default scalable';
+            btn.style.marginLeft = '8px';
+            btn.style.maxWidth = '550px';
+            btn.style.backgroundColor = '#3b5998';
+            btn.style.color = '#ffffff';
+            btn.style.border = '1px solid #2d4373';
+            btn.style.padding = '6px 14px';
+            btn.style.fontWeight = '600';
+            btn.style.cursor = 'pointer';
+            btn.onmouseover = function() { btn.style.backgroundColor = '#2d4373'; };
+            btn.onmouseout = function() { btn.style.backgroundColor = '#3b5998'; };
+            btn.setAttribute('title', '<?php echo __('Send Product to Fastcoo'); ?>');
+            btn.innerHTML = '<span><?php echo __('Send Product'); ?></span>';
+            return btn;
+        }
+
+        function findToolbar() {
+            var toolbarSelectors = [
+                '.page-actions .page-actions-items',
+                '.page-actions-buttons',
+                '[data-ui-id="page-actions-toolbar-content-header"]',
+                '.page-main-actions',
+                '.admin__page-actions',
+                '#add_new_product'
+            ];
+            for (var i=0;i<toolbarSelectors.length;i++){
+                var el = document.querySelector(toolbarSelectors[i]);
+                if (el) return el;
+            }
+            var header = document.querySelector('.page-title');
+            if (header && header.parentElement) return header.parentElement;
+            return document.body;
+        }
+
+        // --- Inline message box ---
+        function ensureResultBox() {
+            var id = 'fastcoo-ajax-result';
+            var box = document.getElementById(id);
+            if (!box) {
+                box = document.createElement('div');
+                box.id = id;
+                box.style.display = 'none';
+                box.style.maxWidth = '700px';
+                box.style.margin = '10px 0';
+                box.style.padding = '12px';
+                box.style.borderRadius = '6px';
+                box.style.boxSizing = 'border-box';
+                box.style.fontFamily = 'Arial, Helvetica, sans-serif';
+                var place = findToolbar();
+                try { place.parentNode.insertBefore(box, place.nextSibling); } catch(e) { document.body.insertBefore(box, document.body.firstChild); }
+            }
+            return box;
+        }
+
+        // show structured html: two sections - successes and errors
+        function showStructuredDetails(results) {
+            var box = ensureResultBox();
+            box.style.display = 'block';
+
+            // Build success and error lists
+            var successes = [];
+            var errors = [];
+
+            if (Array.isArray(results)) {
+                results.forEach(function(r){
+                    var skuText = r.sku ? String(r.sku) : null;
+                    var msgText = r.message ? String(r.message) : '';
+                    var status = (r.status || '').toString().toLowerCase();
+
+                    if (status === 'success' || status === 'ok') {
+                        successes.push({ sku: skuText, message: msgText });
+                    } else {
+                        errors.push({ sku: skuText, message: msgText });
+                    }
+                });
+            }
+
+            // Create HTML
+            var html = '';
+
+            if (successes.length) {
+                html += '<div class="ff-heading"><?php echo addslashes(__('Successful')); ?> ('+successes.length+')</div>';
+                html += '<ul>';
+                successes.forEach(function(it){
+                    var skuPart = it.sku ? '<span class="sku">SKU: '+ escapeHtml(it.sku) +'</span>' : '<span class="sku">Product</span>';
+                    html += '<li><span class="success-badge"><?php echo addslashes(__('SUCCESS')); ?></span>' + skuPart + ' — ' + escapeHtml(it.message) + '</li>';
+                });
+                html += '</ul>';
+            }
+
+            if (errors.length) {
+                html += '<div class="ff-heading"><?php echo addslashes(__('Failed')); ?> ('+errors.length+')</div>';
+                html += '<ul>';
+                errors.forEach(function(it){
+                    var skuPart = it.sku ? '<span class="sku">SKU: '+ escapeHtml(it.sku) +'</span>' : '<span class="sku">Product</span>';
+                    html += '<li><span class="error-badge"><?php echo addslashes(__('ERROR')); ?></span>' + skuPart + ' — ' + escapeHtml(it.message) + '</li>';
+                });
+                html += '</ul>';
+            }
+
+            if (!successes.length && !errors.length) {
+                html = '<div>' + escapeHtml('<?php echo addslashes(__('No detailed results returned.')); ?>') + '</div>';
+            }
+
+            // choose box style: if any errors -> error style else success
+            if (errors.length) {
+                box.style.background = '#fff4f4';
+                box.style.border = '1px solid #e0a1a1';
+            } else {
+                box.style.background = '#f3fff3';
+                box.style.border = '1px solid #9fd09a';
+            }
+
+            box.innerHTML = html;
+            try { box.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+        }
+
+        // helper to escape HTML
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // --- Collect selected product IDs ---
+        // --- Collect selected product IDs (only positive integers) ---
+function collectSelectedProductIds() {
+    var ids = [];
+    $('input.admin__control-checkbox:checked').each(function() {
+        var v = $(this).val() || $(this).attr('value');
+        if (!v) return;
+        // Try to parse integer id
+        var n = parseInt(String(v).trim(), 10);
+        if (!isNaN(n) && n > 0) {
+            ids.push(String(n));
+        }
+    });
+    // Debug: see exactly what will be sent
+    try { console.log('fastcoo: selected ids ->', ids); } catch(e){}
+    return Array.from(new Set(ids));
+}
+
+
+        // --- Insert button ---
+        function insertButtonOnce() {
+            if (document.getElementById('fastcoo-custom-action')) return true;
+            var place = findToolbar();
+            if (!place) return false;
+            var btn = createButtonElement();
+            btn.addEventListener('click', onFastcooClick, false);
+            try { place.appendChild(btn); } catch(e) { if (place.parentNode) place.parentNode.appendChild(btn); else document.body.appendChild(btn); }
+            return true;
+        }
+
+        // --- Click handler ---
+        function onFastcooClick(e) {
+            e.preventDefault();
+            var ids = collectSelectedProductIds();
+            if (!ids.length) {
+                var selMsg = '<?php echo addslashes(__('Please select at least one product.')); ?>';
+                showStructuredDetails([{ sku: null, status: 'error', message: selMsg }]);
+                return;
+            }
+
+            var postData = { 'ids[]': ids };
+            if (window.FORM_KEY) postData.form_key = window.FORM_KEY;
+
+            // show temporary info
+            var box = ensureResultBox();
+            box.style.display = 'block';
+            box.innerHTML = '<div class="ff-heading"><?php echo addslashes(__('Processing...')); ?></div><div><?php echo addslashes(__('Sending products to Fastcoo...')); ?></div>';
+
+            $.ajax({
+                url: '<?php echo $ajaxUrl; ?>',
+                type: 'POST',
+                dataType: 'json',
+                data: postData,
+                showLoader: true
+            }).done(function(resp) {
+                if (!resp || typeof resp !== 'object') {
+                    showStructuredDetails([{ sku: null, status: 'error', message: '<?php echo addslashes(__('Invalid response from server.')); ?>' }]);
+                    return;
+                }
+
+                // Prefer structured `results` array if provided by backend
+                if (Array.isArray(resp.results) && resp.results.length) {
+                    showStructuredDetails(resp.results);
+                    return;
+                }
+
+                // Fallback: if backend returned 'failed' array or message, show as single error
+                if (Array.isArray(resp.failed) && resp.failed.length) {
+                    var fallback = resp.failed.map(function(m){ return { sku: null, status: 'error', message: m }; });
+                    showStructuredDetails(fallback);
+                    return;
+                }
+
+                // Last resort: show single message from resp.message
+                if (resp.message) {
+                    showStructuredDetails([{ sku: null, status: (resp.success ? 'success' : 'error'), message: resp.message }]);
+                    return;
+                }
+
+                // Nothing meaningful returned
+                showStructuredDetails([]);
+            }).fail(function(xhr) {
+                var msg = '<?php echo addslashes(__('Request failed — check console.')); ?>';
+                try { var p = JSON.parse(xhr.responseText||'{}'); if (p.message) msg = p.message; } catch(e){}
+                showStructuredDetails([{ sku: null, status: 'error', message: msg }]);
+            });
+        }
+
+        // insert button
+        if (!insertButtonOnce()) {
+            var mo = new MutationObserver(function(muts, obs) {
+                if (insertButtonOnce()) obs.disconnect();
+            });
+            try { mo.observe(document.documentElement || document.body, { childList: true, subtree: true }); } catch(e){}
+        }
+
+    });
+});
+</script>

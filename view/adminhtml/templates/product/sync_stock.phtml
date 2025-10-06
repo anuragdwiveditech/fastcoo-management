@@ -1,0 +1,174 @@
+<?php
+/** @var $block \Magento\Backend\Block\Template */
+$syncUrl = $block->getUrl('fastcoo/product/stockupdate');
+?>
+<style>
+    #syncstock-custom-action { margin-left:8px; }
+    #fastcoo-messages {
+        max-width: 550px;
+        box-sizing: border-box;
+        margin: 10px 0;
+    }
+</style>
+
+<script type="text/javascript">
+require(['jquery'], function($) {
+    'use strict';
+    $(function() {
+
+        function getSelectedIds() {
+            var ids = [];
+            $('input.admin__control-checkbox:checked').each(function() {
+                var v = $(this).val() || $(this).attr('value');
+                if (v) ids.push(String(v).trim());
+            });
+            return Array.from(new Set(ids));
+        }
+
+        function showMessage(text, type) {
+            type = type || 'notice';
+            var actionsContainer = document.querySelector('.page-main-actions');
+            var messagesContainer = document.getElementById('fastcoo-messages');
+
+            if (!messagesContainer) {
+                messagesContainer = document.createElement('div');
+                messagesContainer.id = 'fastcoo-messages';
+                if (actionsContainer && actionsContainer.parentNode) {
+                    actionsContainer.parentNode.insertBefore(messagesContainer, actionsContainer.nextSibling);
+                } else {
+                    document.body.prepend(messagesContainer);
+                }
+            }
+
+            messagesContainer.innerHTML = '';
+
+            var typeClass = 'message-success success';
+            if (type === 'error') typeClass = 'message-error error';
+            else if (type === 'notice') typeClass = 'message-notice notice';
+
+            var msgDiv = document.createElement('div');
+            msgDiv.className = 'message ' + typeClass + ' fastcoo-message';
+            msgDiv.innerHTML = '<div data-ui-id="messages-message-' + type + '">' + text + '</div>';
+            messagesContainer.appendChild(msgDiv);
+        }
+
+        // Display message from localStorage after reload (support storing JSON {text,type})
+        if (localStorage.getItem('fastcoo_stock_message')) {
+            try {
+                var payload = JSON.parse(localStorage.getItem('fastcoo_stock_message'));
+                if (payload && payload.text) {
+                    showMessage(payload.text, payload.type || 'success');
+                } else {
+                    // fallback if plain string stored
+                    showMessage(localStorage.getItem('fastcoo_stock_message'), 'success');
+                }
+            } catch (e) {
+                // plain string
+                showMessage(localStorage.getItem('fastcoo_stock_message'), 'success');
+            }
+            localStorage.removeItem('fastcoo_stock_message');
+        }
+
+        var btn = document.createElement('button');
+        btn.id = 'syncstock-custom-action';
+        btn.type = 'button';
+        btn.className = 'action-default scalable';
+        btn.style.marginLeft = '8px';
+        btn.style.backgroundColor = '#0b827cff';
+        btn.style.color = '#fff';
+        btn.style.padding = '4px 10px';
+        btn.innerHTML = '<span><?php echo __('Sync & Stock'); ?></span>';
+
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var ids = getSelectedIds();
+            if (!ids.length) {
+                showMessage('<?php echo __('Please select at least one product to sync stock.'); ?>', 'error');
+                return;
+            }
+
+            var data = {'ids[]': ids};
+            if (window.FORM_KEY) data.form_key = window.FORM_KEY;
+
+            showMessage('<?php echo __('Syncing stock...'); ?>', 'notice');
+
+            $.ajax({
+                url: '<?php echo $syncUrl; ?>',
+                type: 'POST',
+                dataType: 'json',
+                data: data,
+                showLoader: true
+            }).done(function(resp) {
+                // build message and determine type
+                var updatedProducts = (resp && resp.updatedProducts) ? resp.updatedProducts : [];
+                var missingProducts = (resp && resp.missingProducts) ? resp.missingProducts : [];
+                var msg = '';
+                var type = 'success';
+
+                if (updatedProducts.length) {
+                    msg += '<?php echo __('Quantity updated successfully for:'); ?> ' + updatedProducts.join(', ') + '. ';
+                }
+                if (missingProducts.length) {
+                    msg += '<?php echo __('SKU(s) not found in Fastcoo:'); ?> ' + missingProducts.join(', ') + '. ';
+                }
+                if ((!updatedProducts.length && !missingProducts.length) && resp && resp.message) {
+                    msg = resp.message;
+                    // treat server-declared success flag; if explicit success=false, mark as error
+                    if (resp.success === false) type = 'error';
+                }
+
+                // If server returned success === false and no message built, show default error
+                if (resp && resp.success === false && !msg) {
+                    msg = resp.message || '<?php echo __('Stock sync failed.'); ?>';
+                    type = 'error';
+                }
+
+                // If resp is missing or not an object or no meaningful msg, fallback
+                if (!resp || typeof resp !== 'object') {
+                    msg = '<?php echo __('Invalid response from server.'); ?>';
+                    type = 'error';
+                }
+
+                // Save JSON payload to localStorage so it can be shown after reload
+                localStorage.setItem('fastcoo_stock_message', JSON.stringify({ text: String(msg), type: type }));
+
+                // Reload the page always (as requested: same behavior for errors & success)
+                window.location.reload();
+
+            }).fail(function(xhr) {
+                var msg = '<?php echo __('Request failed — check server logs.'); ?>';
+                try {
+                    var p = JSON.parse(xhr.responseText || '{}');
+                    if (p && p.message) msg = p.message;
+                } catch(e){}
+
+                // save failure message and type to localStorage then reload
+                localStorage.setItem('fastcoo_stock_message', JSON.stringify({ text: String(msg), type: 'error' }));
+                window.location.reload();
+            });
+        });
+
+        // Append button to toolbar
+        var appended = false;
+        var selectors = [
+            '.page-actions .page-actions-items',
+            '.page-actions-buttons',
+            '[data-ui-id="page-actions-toolbar-content-header"]',
+            '.page-main-actions',
+            '.admin__page-actions'
+        ];
+        for (var i=0;i<selectors.length;i++) {
+            var el = document.querySelector(selectors[i]);
+            if (el) {
+                try { el.appendChild(btn); appended = true; break; } catch(e){}
+            }
+        }
+        if (!appended) {
+            var header = document.querySelector('.page-title');
+            if (header && header.parentElement) header.parentElement.appendChild(btn);
+            else document.body.appendChild(btn);
+        }
+
+    });
+});
+</script>
