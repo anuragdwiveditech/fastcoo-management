@@ -14,5 +14,11 @@
     "psr-4": {
       "Fastcoo\\Management\\": ""
     }
-  }
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/anuragdwiveditech/fastcoo-management.git"
+    }
+  ]
 }
