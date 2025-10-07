@@ -77,7 +77,7 @@ class ProductDataProvider extends \Magento\Ui\DataProvider\AbstractDataProvider
      * @return array
      */
     public function getData()
-    { print_r('dfgdf'); die();
+    {
         if (!$this->getCollection()->isLoaded()) {
             $this->getCollection()->load();
         }
