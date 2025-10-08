@@ -28,7 +28,7 @@
         </arguments>
     </virtualType>
     
-    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+    <!-- <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
         <arguments>
             <argument name="collections" xsi:type="array">
                 <item name="sales_order_grid_data_source" xsi:type="string">SalesOrderGridCollection</item>
@@ -36,7 +36,7 @@
                 <item name="fastcoo_order_listing_data_source" xsi:type="string">Fastcoo\Fastcoo\Model\ResourceModel\Order\Grid\Collection</item>
             </argument>
         </arguments>
-    </type>
+    </type> -->
 
     <type name="Fastcoo\Management\Controller\Adminhtml\Order\MassSend">
     <arguments>
