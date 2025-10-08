@@ -11,7 +11,7 @@
            template="Fastcoo_Management::grid/send-order-button.phtml" before="-"/>
      </referenceContainer>
         <referenceContainer name="content">
-         <uiComponent name="fastcoo_order_listing"/>
+         <uiComponent name="sales_order_grid"/>
         </referenceContainer>
       
 
