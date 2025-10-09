@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fastcoo Order Listing UI Component
+-->
 <listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd"
-         xsi:schemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd sales_order_grid.xml">
-
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
     <argument name="data" xsi:type="array">
         <item name="js_config" xsi:type="array">
-            <item name="provider" xsi:type="string">fastcoo_order_listing.fastcoo_order_listing_data_source</item>
+            <!-- provider: <file_name>.<dataSource_name> -->
+            <item name="provider" xsi:type="string">fastcoo_order_listing.sales_order_grid_data_source</item>
         </item>
     </argument>
 
@@ -18,21 +20,23 @@
                 <aclResource>Magento_Sales::create</aclResource>
             </button>
         </buttons>
-        <spinner>fastcoo_order_listing_columns</spinner>
+        <spinner>sales_order_columns</spinner>
         <deps>
-            <dep>fastcoo_order_listing.fastcoo_order_listing_data_source</dep>
+            <dep>fastcoo_order_listing.sales_order_grid_data_source</dep>
         </deps>
     </settings>
 
-    <dataSource name="fastcoo_order_listing_data_source" component="Magento_Ui/js/grid/provider">
+    <dataSource name="sales_order_grid_data_source" component="Magento_Ui/js/grid/provider">
         <settings>
             <updateUrl path="mui/index/render"/>
         </settings>
+        <aclResource>Magento_Sales::sales_order</aclResource>
+
         <dataProvider class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider"
-                      name="fastcoo_order_listing_data_source">
+                      name="sales_order_grid_data_source">
             <settings>
                 <requestFieldName>id</requestFieldName>
-                <primaryFieldName>main_table.entity_id</primaryFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
             </settings>
         </dataProvider>
     </dataSource>
@@ -116,33 +120,16 @@
                     <label translate="true">Print Shipping Labels</label>
                 </settings>
             </action>
-
-            <action name="send_order">
-                <settings>
-                    <url path="fastcoo/order/massSend"/>
-                    <type>send_order</type>
-                    <label translate="true">Send Order</label>
-                </settings>
-            </action>
-
-            <action name="track_sync">
-                <settings>
-                    <url path="fastcoo/order/sync"/>
-                    <type>track_sync</type>
-                    <!-- ESCAPE & as &amp; below -->
-                    <label translate="true">Track &amp; Sync</label>
-                </settings>
-            </action>
         </massaction>
 
         <paging name="listing_paging"/>
     </listingToolbar>
 
-    <columns name="fastcoo_order_listing_columns">
+    <columns name="sales_order_columns">
         <settings>
             <childDefaults>
                 <param name="fieldAction" xsi:type="array">
-                    <item name="provider" xsi:type="string">sales_order_grid.sales_order_grid.sales_order_columns.actions</item>
+                    <item name="provider" xsi:type="string">fastcoo_order_listing.sales_order_grid.sales_order_columns.actions</item>
                     <item name="target" xsi:type="string">applyAction</item>
                     <item name="params" xsi:type="array">
                         <item name="0" xsi:type="string">view</item>
@@ -155,7 +142,6 @@
         <selectionsColumn name="ids" component="Magento_Sales/js/grid/columns/multiselect">
             <settings>
                 <indexField>entity_id</indexField>
-                
             </settings>
         </selectionsColumn>
 
@@ -165,8 +151,6 @@
                 <label translate="true">ID</label>
             </settings>
         </column>
-
-        
 
         <column name="store_id" class="Magento\Store\Ui\Component\Listing\Column\Store">
             <settings>
@@ -222,7 +206,12 @@
             </settings>
         </column>
 
-        <column name="awb_no" class="Fastcoo\Management\Ui\Component\Listing\Column\Awb" >
+
+
+
+
+
+                <column name="awb_no" class="Fastcoo\Management\Ui\Component\Listing\Column\Awb" >
             <settings>
                 <label translate="true">AWB No</label>
                 <sortable>false</sortable>
@@ -299,7 +288,13 @@
             </settings>
         </column>
 
-       
+        <column name="customer_name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Customer Name</label>
+                <visible>false</visible>
+            </settings>
+        </column>
 
         <column name="payment_method" component="Magento_Ui/js/grid/columns/select">
             <settings>
