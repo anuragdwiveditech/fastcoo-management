@@ -109,29 +109,36 @@ class Sync extends Action
 
         // Explicit mapping (fast-path)
         $explicitCodeToStatus = [
-            'OG' => 'processing',
-            'B'  => 'processing', // <- ADDED: map code B to processing
-            // add more explicit mappings as needed
+            'OG'     => 'processing',
+            'IT'     => 'processing',
+            'B'      => 'processing', // Booked -> processing
+            'POD'    => 'complete',
+            'CLOSED' => 'closed',
+            'UNHOLD' => 'unhold',
+            'OH'     => 'holded', // <- new: OH -> holded (Hold for pickup)
         ];
 
         // code -> candidate label names
         $codeToNames = [
-            'OC'  => ['Processing'],
-            'B'   => ['Processing'],
-            'OD'  => ['Processing'],
-            'PG'  => ['Processing'],
-            'AP'  => ['Processing'],
-            'PK'  => ['Shipped','Processed'],
-            'DL'  => ['Shipped'],
-            'POD' => ['Complete','Delivered'],
-            'RTC' => ['Processed','Refunded','Returned'],
-            'C'   => ['Canceled'],
-            'FWD' => ['Shipped'],
-            'OG'  => ['Processing','Pending'],
+            'OC'    => ['Processing'],
+            'B'     => ['Processing'],
+            'OD'    => ['Processing'],
+            'PG'    => ['Processing'],
+            'AP'    => ['Processing'],
+            'PK'    => ['Shipped','Processed'],
+            'DL'    => ['Shipped'],
+            'POD'   => ['Complete','Delivered'],
+            'RTC'   => ['Processed','Refunded','Returned'],
+            'C'     => ['Canceled'],
+            'FWD'   => ['Shipped'],
+            'OG'    => ['Processing'],
+            'IT'    => ['Processing'],
+            'CLOSED'=> ['Closed'],
+            'UNHOLD'=> ['Unhold'],
+            'OH'    => ['On Hold','Hold for pickup','Hold'], // helpful candidates
         ];
 
         foreach ($selected as $row) {
-
             // allow formats "123|AWB" or "123"
             $parts = explode('|', $row . '|');
             $orderId = isset($parts[0]) ? (int)$parts[0] : 0;
@@ -142,7 +149,7 @@ class Sync extends Action
                 continue;
             }
 
-            // if awb empty try to fetch
+            // fetch awb if missing
             if ($awb_no === '') {
                 $fastcooOrdersTable = $resource->getTableName('fastcoo_orders');
                 try {
@@ -207,16 +214,97 @@ class Sync extends Action
                 continue;
             }
 
+            // primary values
             $code = isset($result['shipment_data']['code']) ? trim($result['shipment_data']['code']) : '';
             $statusText = isset($result['shipment_data']['status']) ? trim($result['shipment_data']['status']) : '';
 
+            // if travel_history contains more recent entries, prefer last activity status/code
+            if (isset($result['travel_history']) && is_array($result['travel_history']) && count($result['travel_history']) > 0) {
+                // take last element
+                $last = end($result['travel_history']);
+                if (isset($last['code']) && trim($last['code']) !== '') {
+                    $code = trim($last['code']);
+                }
+                if (isset($last['new_status']) && trim($last['new_status']) !== '') {
+                    $statusText = trim($last['new_status']);
+                }
+                // reset pointer (optional)
+                reset($result['travel_history']);
+            }
+
             $mappedStatusCode = null;
 
-            // 0) explicit fast mapping by code
+            // 0) explicit mapping by code (resolve to DB status if possible)
             if ($code !== '') {
                 $uc = strtoupper($code);
                 if (isset($explicitCodeToStatus[$uc]) && $explicitCodeToStatus[$uc]) {
-                    $mappedStatusCode = $explicitCodeToStatus[$uc];
+                    $candidate = $explicitCodeToStatus[$uc];
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                        [strtolower($candidate)]
+                    );
+                    if ($found) {
+                        $mappedStatusCode = $found;
+                    } else {
+                        $mappedStatusCode = $candidate;
+                    }
+                }
+            }
+
+            // QUICK-RULE: treat "booked", "pickup", "scheduled" in statusText as processing
+            if ($mappedStatusCode === null && $statusText !== '') {
+                $lowerStatus = strtolower($statusText);
+                if (
+                    stripos($lowerStatus, 'booked') !== false ||
+                    stripos($lowerStatus, 'pickup') !== false ||
+                    stripos($lowerStatus, 'scheduled') !== false ||
+                    stripos($lowerStatus, 'booked-pickup') !== false
+                ) {
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                        ['processing']
+                    );
+                    if ($found) {
+                        $mappedStatusCode = $found;
+                    } else {
+                        $mappedStatusCode = 'processing';
+                    }
+                }
+            }
+
+            // quick checks for 'on hold' / 'closed' / 'unhold' / 'hold for pickup' in status text
+            if ($mappedStatusCode === null && $statusText !== '') {
+                $lowerStatus = strtolower($statusText);
+
+                // Hold for pickup / On Hold => holded
+                if (stripos($lowerStatus, 'hold for pickup') !== false
+                    || stripos($lowerStatus, 'hold for') !== false
+                    || stripos($lowerStatus, 'on hold') !== false
+                    || stripos($lowerStatus, 'hold') !== false
+                ) {
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) IN (?,?) LIMIT 1",
+                        ['holded', 'on hold']
+                    );
+                    $mappedStatusCode = $found ?: 'holded';
+                }
+
+                // closed => closed
+                if ($mappedStatusCode === null && stripos($lowerStatus, 'closed') !== false) {
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                        ['closed']
+                    );
+                    $mappedStatusCode = $found ?: 'closed';
+                }
+
+                // unhold / release => unhold
+                if ($mappedStatusCode === null && (stripos($lowerStatus, 'unhold') !== false || stripos($lowerStatus, 'release') !== false || stripos($lowerStatus, 'released') !== false)) {
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                        ['unhold']
+                    );
+                    $mappedStatusCode = $found ?: 'unhold';
                 }
             }
 
@@ -226,7 +314,10 @@ class Sync extends Action
                 if (isset($codeToNames[$uc]) && is_array($codeToNames[$uc])) {
                     foreach ($codeToNames[$uc] as $candName) {
                         $bind = [strtolower($candName)];
-                        $found = $connection->fetchOne("SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1", $bind);
+                        $found = $connection->fetchOne(
+                            "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                            $bind
+                        );
                         if ($found) {
                             $mappedStatusCode = $found;
                             break;
@@ -238,22 +329,31 @@ class Sync extends Action
             // 2) exact match of returned status text
             if ($mappedStatusCode === null && $statusText !== '') {
                 $bind = [strtolower($statusText)];
-                $found = $connection->fetchOne("SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1", $bind);
+                $found = $connection->fetchOne(
+                    "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                    $bind
+                );
                 if ($found) $mappedStatusCode = $found;
             }
 
             // 3) partial match (LIKE) on label
             if ($mappedStatusCode === null && $statusText !== '') {
-                $found = $connection->fetchOne("SELECT status FROM {$statusLabelTable} WHERE label LIKE ? LIMIT 1", ['%' . $statusText . '%']);
+                $found = $connection->fetchOne(
+                    "SELECT status FROM {$statusLabelTable} WHERE label LIKE ? LIMIT 1",
+                    ['%' . $statusText . '%']
+                );
                 if ($found) $mappedStatusCode = $found;
             }
 
             // 4) fallback keywords mapping (use statusText)
             if ($mappedStatusCode === null && $statusText !== '') {
-                $fallbackKeywords = ['Processing','Shipped','Complete','Pending','Canceled','Refunded','Returned','Failed','Denied','Expired','Processed','Voided','Delivered'];
+                $fallbackKeywords = ['Processing','Shipped','Complete','Pending','Canceled','Refunded','Returned','Failed','Denied','Expired','Processed','Voided','Delivered','Closed','Unhold','Hold'];
                 foreach ($fallbackKeywords as $kw) {
                     if (stripos($statusText, $kw) !== false) {
-                        $found = $connection->fetchOne("SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1", [strtolower($kw)]);
+                        $found = $connection->fetchOne(
+                            "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                            [strtolower($kw)]
+                        );
                         if ($found) {
                             $mappedStatusCode = $found;
                             break;
@@ -262,21 +362,21 @@ class Sync extends Action
                 }
             }
 
-            // 5) Additional custom quick rules for reported statuses like "Booked-Pickup Scheduled"
+            // 5) Additional custom quick rules (repeat booked-pickup check as extra safety)
             if ($mappedStatusCode === null && $statusText !== '') {
                 $lowerStatus = strtolower($statusText);
-                // If response says Booked or Pickup or Scheduled -> consider Processing
                 if (stripos($lowerStatus, 'booked') !== false
                     || stripos($lowerStatus, 'pickup') !== false
                     || stripos($lowerStatus, 'scheduled') !== false
                     || stripos($lowerStatus, 'booked-pickup') !== false
                 ) {
-                    // try to find 'processing' in sales_order_status_label
-                    $found = $connection->fetchOne("SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1", ['processing']);
+                    $found = $connection->fetchOne(
+                        "SELECT status FROM {$statusLabelTable} WHERE LOWER(label) = ? LIMIT 1",
+                        ['processing']
+                    );
                     if ($found) {
                         $mappedStatusCode = $found;
                     } else {
-                        // if label not found, fallback to 'processing' literal (may be valid code)
                         $mappedStatusCode = 'processing';
                     }
                 }
@@ -284,17 +384,49 @@ class Sync extends Action
 
             if ($mappedStatusCode === null) {
                 $messagesError[] = __("AWB %1 synced, but status/code not mapped. (code: %2, status: %3)", $awb_no, $code, $statusText);
-                // log for debugging
                 $logger->warning("Fastcoo Sync: unmapped AWB {$awb_no} (code={$code}, status='{$statusText}')");
                 continue;
             }
 
             // update Magento order status
             try {
+                // get order via repository
                 $order = $orderRepository->get($orderId);
+
+                // load concrete order model to call unhold if needed
+                /** @var \Magento\Sales\Model\Order $orderModel */
+                $orderModel = $om->create(\Magento\Sales\Model\Order::class)->load($orderId);
+
                 $comment = __("Fastcoo Sync: AWB %1 (code: %2) → %3", $awb_no, $code, $statusText);
+
+                // If mapped status is literal 'unhold' or statusText contained unhold/release -> attempt unhold action
+                $isUnholdTarget = (is_string($mappedStatusCode) && strtolower($mappedStatusCode) === 'unhold')
+                    || (stripos($statusText, 'unhold') !== false)
+                    || (stripos($statusText, 'release') !== false)
+                    || (stripos($statusText, 'released') !== false);
+
+                if ($isUnholdTarget && $orderModel) {
+                    try {
+                        if (method_exists($orderModel, 'canUnhold') && method_exists($orderModel, 'unhold')) {
+                            if ($orderModel->canUnhold()) {
+                                $orderModel->unhold();
+                                // save concrete model
+                                $orderRepository->save($orderModel);
+                                // refresh $order from repository
+                                $order = $orderRepository->get($orderId);
+                                // add history about unhold
+                                $order->addStatusToHistory($order->getStatus(), __("Fastcoo Sync: order unheld for AWB %1", $awb_no), false);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        $logger->warning("Fastcoo Sync: unhold attempt failed for order {$orderId}: " . $e->getMessage());
+                    }
+                }
+
+                // Finally set the mapped status (DB-resolved or literal)
                 $order->addStatusToHistory($mappedStatusCode, $comment, false);
                 $order->setStatus($mappedStatusCode);
+
                 $orderRepository->save($order);
                 $messages[] = __("AWB %1 synced successfully. Status updated to: %2", $awb_no, $statusText);
             } catch (\Throwable $e) {
