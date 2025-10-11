@@ -152,6 +152,26 @@ class MassSend extends Action
                 continue;
             }
 
+            // ----- DUPLICATE CHECK: अगर fastcoo_orders में पहले से है तो SKIP कर दो -----
+            try {
+                $conn = $this->resourceConnection->getConnection();
+                $tableOrders = $this->resourceConnection->getTableName('fastcoo_orders');
+                $sql = "SELECT 1 FROM {$tableOrders} WHERE order_id = :order_id LIMIT 1";
+                $exists = $conn->fetchOne($sql, ['order_id' => $orderId]);
+
+                if ($exists) {
+                    // पहले से बना हुआ — skip this order
+                    $messagesError[] = "Order #{$orderId} skipped - already created previously (fastcoo_orders).";
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                // DB check failed — log and skip to be safe
+                $this->logger->error("Fastcoo duplicate-check failed for order {$orderId}: " . $e->getMessage());
+                $messagesError[] = "Order #{$orderId} skipped - duplicate-check DB error.";
+                continue;
+            }
+            // ----- END DUPLICATE CHECK -----
+
             // Build product details
             $items = $order->getItems();
             $totalPieces = 0;
@@ -211,7 +231,7 @@ class MassSend extends Action
                     'receiver_name' => $order->getShippingAddress() ? $order->getShippingAddress()->getFirstname() . ' ' . $order->getShippingAddress()->getLastname() : '',
                     'receiver_email' => $order->getCustomerEmail(),
                     'receiver_phone' => $order->getShippingAddress() ? $order->getShippingAddress()->getTelephone() : '',
-                    'receiver_address' => $receiverAddress, // <-- ADDED receiver address here
+                    'receiver_address' => $receiverAddress,
                     'origin' => $origin,
                     'destination' => $destination,
                     'BookingMode' => $bookingMode,
@@ -225,10 +245,10 @@ class MassSend extends Action
                 'method' => 'createOrder',
                 'customerId' => $settings['customer_id'],
                  'secret_key' => $settings['secret_key']
-            ];  
+            ];
 
             $url = $systemType === 'lm' ? $lm_url : $fm_url;
-          
+
             try {
                 $this->curl->setOption(CURLOPT_TIMEOUT, 30);
                 $this->curl->setOption(CURLOPT_CONNECTTIMEOUT, 10);
@@ -238,11 +258,8 @@ class MassSend extends Action
                 $this->curl->post($url, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
                 $response = $this->curl->getBody();
-                
-               
-                $result = json_decode($response, true);
 
-               
+                $result = json_decode($response, true);
 
                 $success = isset($result['status']) && ($result['status'] == 200 || $result['status'] === true);
 
